@@ -1,0 +1,73 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Chat</title>
+  <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/stompjs@2/dist/stomp.min.js"></script>
+</head>
+<body>
+<h1>WebSocket Chat</h1>
+<div style="display:flex;gap:10px;">
+  <div style="flex:1;">
+    <h3>Messages</h3>
+    <div id="messages" style="height:200px; overflow-y:auto; border:1px solid #ccc;"></div>
+  </div>
+  <div style="width:150px;">
+    <h3>Users</h3>
+    <ul id="users" style="height:200px; overflow-y:auto; border:1px solid #ccc;"></ul>
+  </div>
+</div>
+<input id="from" placeholder="Name" />
+<input id="content" placeholder="Message" />
+<button onclick="send()">Send</button>
+<script>
+  var sock = new SockJS('/chat');
+  var stomp = Stomp.over(sock);
+  stomp.connect({}, function() {
+    join();
+    stomp.subscribe('/topic/messages', function(m) {
+      var msg = JSON.parse(m.body);
+      var div = document.getElementById('messages');
+      div.innerHTML += '<p><b>' + msg.from + ':</b> ' + msg.content + '</p>';
+      div.scrollTop = div.scrollHeight;
+    });
+    stomp.subscribe('/topic/users', function(m) {
+      var list = JSON.parse(m.body);
+      var ul = document.getElementById('users');
+      ul.innerHTML = '';
+      list.forEach(function(u) {
+        ul.innerHTML += '<li>' + u + '</li>';
+      });
+    });
+  });
+
+  function join() {
+    var name = document.getElementById('from').value;
+    fetch('/join', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({name:name})
+    });
+  }
+
+  function leave() {
+    var name = document.getElementById('from').value;
+    fetch('/leave', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({name:name})
+    });
+  }
+  function send() {
+    var msg = {
+      from: document.getElementById('from').value,
+      content: document.getElementById('content').value
+    };
+    stomp.send('/app/chat', {}, JSON.stringify(msg));
+    document.getElementById('content').value = '';
+  }
+  window.addEventListener('beforeunload', leave);
+</script>
+</body>
+</html>
